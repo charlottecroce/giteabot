@@ -35,34 +35,54 @@ const basic = (token) =>
 const many = (v) => (v === undefined || v === null ? [] : Array.isArray(v) ? v : [v]);
 
 /*
- * Tags are only stripped when the node declares type="html". Entities are
- * already decoded by the time we see them, so blanket-stripping would eat the
- * angle brackets out of a plain-text title like `charlotte pushed <tag>`
+ * Gitea puts markup in the title - an <a> around the repo, sometimes <code>
+ * around a branch. Slack can't nest a link inside a link and the whole message
+ * already is one, so the markup has to come out.
  */
+const TAG = /<\/?(?:a|b|i|em|strong|code|span|div|p|br|img)\b[^>]*>/gi;
+
 const text = (v) => {
-  if (v === undefined || v === null) return '';
-  const html = typeof v === 'object' && v['@_type'] === 'html';
-  let s = String(typeof v === 'object' ? (v['#text'] ?? '') : v);
-  if (html) s = s.replace(/<[^>]+>/g, ' ');
-  return s.replace(/\s+/g, ' ').trim();
+  const s = String(typeof v === 'object' && v !== null ? (v['#text'] ?? '') : (v ?? ''));
+  return s.replace(TAG, ' ').replace(/\s+/g, ' ').trim();
 };
 
-function atomEntry(e) {
+/*
+ * Gitea builds every link in the feed from ROOT_URL, which is often the address
+ * the server binds to rather than the one people reach it by. Rewrite the origin
+ * to the feed's own, so a link posted into Slack is clickable from a laptop and
+ * matches the TLS cert
+ */
+const rebase = (href, base) => {
+  if (!href) return '';
+  try {
+    const url = new URL(href, base); // a relative href resolves against the feed
+    const feed = new URL(base);
+    url.protocol = feed.protocol;
+    url.host = feed.host; // host, not hostname - carries the port
+    return url.toString();
+  } catch {
+    return href;
+  }
+};
+
+function atomEntry(e, base) {
   // rel="self" points back at the feed, not at the activity
   const href = many(e.link).find((l) => l && l['@_rel'] !== 'self')?.['@_href'] || '';
   return {
+    // The id stays on the RAW href. Rebasing it would change every id at once
+    // and repost the whole feed on the upgrade
     id: text(e.id) || href || text(e.updated),
     title: text(e.title),
-    link: href,
+    link: rebase(href, base),
   };
 }
 
-function rssItem(i) {
+function rssItem(i, base) {
   const link = text(i.link);
   return {
     id: text(i.guid) || link || text(i.pubDate),
     title: text(i.title),
-    link,
+    link: rebase(link, base),
   };
 }
 
@@ -94,8 +114,8 @@ async function fetchFeed(url) {
   const body = String(res.data || '');
   const doc = body.includes('<feed') || body.includes('<rss') ? parser.parse(body) : null;
 
-  if (doc?.feed) return many(doc.feed.entry).map(atomEntry);
-  if (doc?.rss) return many(doc.rss.channel?.item).map(rssItem);
+  if (doc?.feed) return many(doc.feed.entry).map((e) => atomEntry(e, url));
+  if (doc?.rss) return many(doc.rss.channel?.item).map((i) => rssItem(i, url));
 
   throw new Error(`${url} did not return a feed - check the URL`);
 }
