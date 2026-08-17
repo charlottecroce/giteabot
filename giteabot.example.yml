@@ -27,6 +27,16 @@ gitea:
   # reports as "did not return a feed".
   token: ${GITEA_TOKEN}
 
+  # Skip TLS verification. For an internal instance with a self-signed cert
+  # without it the poll fails with "self-signed certificate".
+  #
+  # This turns off verification. Fine inside internal networks
+  # Logged as a warning at every boot.
+  #
+  # If you can get the CA or the cert itself, NODE_EXTRA_CA_CERTS=/path/ca.pem
+  # in the environment is a more secure fix to self-signed cert TLS errors.
+  insecure: false
+
 slack:
   # api.slack.com/apps > Install App > Bot User OAuth Token
   bot_token: ${SLACK_BOT_TOKEN}    # REQUIRED, xoxb-...

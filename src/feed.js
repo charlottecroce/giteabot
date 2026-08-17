@@ -1,5 +1,6 @@
 'use strict';
 
+const https = require('https');
 const axios = require('axios');
 const { XMLParser } = require('fast-xml-parser');
 const config = require('../config');
@@ -13,6 +14,15 @@ const config = require('../config');
  */
 
 const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
+
+/*
+ * One agent for the process so polls reuse the connection instead of
+ * re-handshaking. Only built when verification is off - otherwise axios uses
+ * its own default and the system trust store
+ */
+const agent = config.gitea.insecure
+  ? new https.Agent({ rejectUnauthorized: false, keepAlive: true })
+  : undefined;
 
 /** XML gives a lone child as a bare object, so callers can't just map */
 const many = (v) => (v === undefined || v === null ? [] : Array.isArray(v) ? v : [v]);
@@ -56,6 +66,7 @@ function rssItem(i) {
 async function fetchFeed(url) {
   const res = await axios.get(url, {
     timeout: config.gitea.timeoutMs,
+    httpsAgent: agent,
     responseType: 'text',
     // Gitea answers an unauthenticated private feed with 200 and the login
     // page, so don't let axios guess the type - the shape is checked below

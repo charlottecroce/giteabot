@@ -117,6 +117,14 @@ if (!raw.gitea || !raw.gitea.token) {
   });
 }
 
+// Anything on the path can read the token and rewrite
+// the feed, so it should never be a surprise in the logs
+if (raw.gitea && raw.gitea.insecure) {
+  log.warn('gitea.insecure is set - TLS certificates are not verified', {
+    remedy: 'fine on a trusted network; do not use across one you do not control',
+  });
+}
+
 const pollSeconds = Number(raw.poll_seconds ?? 60);
 if (!Number.isFinite(pollSeconds) || pollSeconds < 15) {
   throw new ConfigError(`poll_seconds must be a number >= 15, got ${JSON.stringify(raw.poll_seconds)}`);
@@ -130,6 +138,9 @@ module.exports = {
 
   gitea: {
     token: (raw.gitea && raw.gitea.token) || '',
+    // Skip TLS verification. For an internal Gitea with a self-signed cert;
+    // see the warning at boot for what it costs
+    insecure: Boolean(raw.gitea && raw.gitea.insecure),
     // Not exposed in the YAML: a feed that takes longer than this is broken,
     // not slow, and the poll loop needs to get on with the next one
     timeoutMs: 15000,
