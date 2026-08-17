@@ -24,6 +24,13 @@ const agent = config.gitea.insecure
   ? new https.Agent({ rejectUnauthorized: false, keepAlive: true })
   : undefined;
 
+/*
+ * Gitea takes the token from whichever field is not the password, so the token
+ * goes in the username slot behind GitHub's x-oauth-basic sentinel
+ */
+const basic = (token) =>
+  `Basic ${Buffer.from(`${token}:x-oauth-basic`).toString('base64')}`;
+
 /** XML gives a lone child as a bare object, so callers can't just map */
 const many = (v) => (v === undefined || v === null ? [] : Array.isArray(v) ? v : [v]);
 
@@ -68,15 +75,21 @@ async function fetchFeed(url) {
     timeout: config.gitea.timeoutMs,
     httpsAgent: agent,
     responseType: 'text',
-    // Gitea answers an unauthenticated private feed with 200 and the login
-    // page, so don't let axios guess the type - the shape is checked below
+    // The response is XML we parse ourselves; don't let axios guess the type
     transformResponse: [(d) => d],
+    // A 3xx is Gitea bouncing us to the login page. Following it turns an auth
+    // failure into a confusing parse failure on the login HTML
+    maxRedirects: 0,
+    validateStatus: (s) => s >= 200 && s < 400,
     headers: {
       Accept: 'application/atom+xml, application/rss+xml',
-      // Gitea honours an API token on the web routes, which is where feeds live
-      ...(config.gitea.token ? { Authorization: `token ${config.gitea.token}` } : {}),
+      ...(config.gitea.token ? { Authorization: basic(config.gitea.token) } : {}),
     },
   });
+
+  if (res.status >= 300) {
+    throw new Error(`${url} redirected to login - gitea.token was not accepted`);
+  }
 
   const body = String(res.data || '');
   const doc = body.includes('<feed') || body.includes('<rss') ? parser.parse(body) : null;
@@ -84,8 +97,7 @@ async function fetchFeed(url) {
   if (doc?.feed) return many(doc.feed.entry).map(atomEntry);
   if (doc?.rss) return many(doc.rss.channel?.item).map(rssItem);
 
-  // Almost always the login page, i.e. a missing or unprivileged gitea.token
-  throw new Error(`${url} did not return a feed - check the URL and gitea.token`);
+  throw new Error(`${url} did not return a feed - check the URL`);
 }
 
 module.exports = { fetchFeed };
