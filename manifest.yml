@@ -1,6 +1,6 @@
 display_information:
   name: Giteabot
-  description: Posts Gitea activity into Slack channels.
+  description: Posts Gitea activity into Slack channels
   background_color: "#1a1c21"
 
 features:
