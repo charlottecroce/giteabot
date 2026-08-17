@@ -1,0 +1,17 @@
+# Deployment config. Holds both tokens, so this must never be committed.
+giteabot.yml
+giteabot.yaml
+!giteabot.example.yml
+
+# Local persistence
+data/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store

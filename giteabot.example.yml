@@ -1,0 +1,57 @@
+# ---------------------------------------------------------------------------
+# Giteabot configuration
+#
+#   cp giteabot.example.yml giteabot.yml
+#   chmod 600 giteabot.yml
+#
+# This is the only config file. Secrets live here too. Giteabot checks the mode
+# at boot and warns if it's readable by anyone but its owner.
+#
+# ${VAR} interpolation is available if your deployment already injects secrets
+# into the environment and you'd rather not write them down twice:
+#
+#   token: ${GITEA_TOKEN}
+#   token: ${GITEA_TOKEN:none}      # with a fallback
+#
+# ---------------------------------------------------------------------------
+
+
+# --- Credentials -----------------------------------------------------------
+
+gitea:
+  # Settings > Applications > Generate New Token, scope `read:repository`
+  # (add read:organization if you're following an org feed).
+  #
+  # Sent as `Authorization: token ...`. Optional if every feed below is public.
+  # without it Gitea answers a private feed with the login page, which giteabot
+  # reports as "did not return a feed".
+  token: ${GITEA_TOKEN}
+
+slack:
+  # api.slack.com/apps > Install App > Bot User OAuth Token
+  bot_token: ${SLACK_BOT_TOKEN}    # REQUIRED, xoxb-...
+
+
+# --- Feeds -----------------------------------------------------------------
+# gitea-url: slack-channel. One line per feed.
+#
+# The URL is any Gitea page that has a feed - a user, an org or a repo. The
+# `.atom` suffix is added if you leave it off, and `.rss` works too. Channel is
+# an ID (C0123456789, from the channel's About tab) or a #name.
+#
+# Invite the bot to each channel, or give it chat:write.public.
+
+feeds:
+  https://git.example.com/infra/dns: C0123456789
+  https://git.example.com/platform-team: C0987654321
+  https://git.example.com/charlotte: "#my-activity"
+
+
+# --- Optional --------------------------------------------------------------
+
+# Seconds between polls, across all feeds. Minimum 15
+poll_seconds: 60
+
+# Where the "already posted" entry IDs are kept. Delete it and every feed
+# re-baselines on the next start
+state_file: ./data/state.json

@@ -1,0 +1,19 @@
+display_information:
+  name: Giteabot
+  description: Posts Gitea activity into Slack channels.
+  background_color: "#1a1c21"
+
+features:
+  bot_user:
+    display_name: giteabot
+    always_online: true
+
+oauth_config:
+  scopes:
+    bot:
+      - chat:write        # post messages
+      - chat:write.public # post to public channels without joining first
+
+settings:
+  org_deploy_enabled: false
+  token_rotation_enabled: false
